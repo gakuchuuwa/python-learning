@@ -21,37 +21,15 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #0d1117; }
     transform-origin: center center;
 }
 @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
-/* Add a simple hover effect for the buttons */
-.scene-button:hover { filter: brightness(1.2); }
+.scene-button:hover { filter: brightness(1.2); transform: scale(1.02); }
+.nav-button:hover { background: rgba(255,255,255,0.2) !important; }
 </style>
 </head>
 <body>
 <div id="root"></div>
 
 <script type="text/babel">
-const { useState, useEffect } = React;
-
-// ── Custom Hook to run animation and STOP at the end ────────────────────────
-function useTime() {
-  const [time, setTime] = useState(0);
-  useEffect(() => {
-    let start = performance.now();
-    let frameId;
-    const tick = (now) => {
-      let current = (now - start) / 1000;
-      // Stop the animation at the end instead of looping
-      if (current >= TOTAL_DUR) {
-        setTime(TOTAL_DUR);
-        return; 
-      }
-      setTime(current);
-      frameId = requestAnimationFrame(tick);
-    };
-    frameId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frameId);
-  }, []);
-  return time;
-}
+const { useState, useEffect, useRef } = React;
 
 // ── Original Scene Data ─────────────────────────────────────────────────────
 const SCENES = [
@@ -69,6 +47,37 @@ const TITLE_DUR = 3;
 const OUTRO_DUR = 4;
 const SCENE_DUR = 5.5;
 const TOTAL_DUR = TITLE_DUR + SCENES.length * SCENE_DUR + OUTRO_DUR;
+
+// ── Custom Hook with Skip Function ──────────────────────────────────────────
+function useTime() {
+  const [time, setTime] = useState(0);
+  const skipRef = useRef(false);
+
+  useEffect(() => {
+    let start = performance.now();
+    let frameId;
+    const tick = (now) => {
+      if (skipRef.current) return; // Stop ticking if we skipped
+      
+      let current = (now - start) / 1000;
+      if (current >= TOTAL_DUR) {
+        setTime(TOTAL_DUR);
+        return; 
+      }
+      setTime(current);
+      frameId = requestAnimationFrame(tick);
+    };
+    frameId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frameId);
+  }, []);
+
+  const skipToEnd = () => {
+    skipRef.current = true;
+    setTime(TOTAL_DUR); // Instantly set time to the end
+  };
+
+  return { time, skipToEnd };
+}
 
 const MONO = '"JetBrains Mono", ui-monospace, monospace';
 const SANS = '"Inter", system-ui, sans-serif';
@@ -332,8 +341,8 @@ function ProgressDots({ idx }) {
 
 // ── App ──────────────────────────────────────────────────────────────────────
 function App() {
-  const t = useTime();
-  const [manualScene, setManualScene] = useState(null); // Tracks if a user clicked a button
+  const { time: t, skipToEnd } = useTime();
+  const [manualScene, setManualScene] = useState(null); 
   
   const outroStart = TITLE_DUR + SCENES.length * SCENE_DUR;
   const inTitle = t < TITLE_DUR;
@@ -341,7 +350,6 @@ function App() {
   const sceneIdx = inTitle ? -1 : inOutro ? SCENES.length : Math.floor((t - TITLE_DUR) / SCENE_DUR);
   const clamped  = Math.max(0, Math.min(SCENES.length - 1, sceneIdx));
 
-  // Auto-scaling logic to fit the 1280x720 stage to the browser window
   const [scale, setScale] = useState(1);
   useEffect(() => {
     const handleResize = () => {
@@ -354,7 +362,7 @@ function App() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // --- REVIEW MODE (When a button is clicked) ---
+  // --- REVIEW MODE ---
   if (manualScene !== null) {
     const scene = SCENES[manualScene];
     return (
@@ -362,13 +370,11 @@ function App() {
         <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px)', backgroundSize: '36px 36px' }}/>
         <div style={{ position: 'absolute', top: -200, left: '50%', width: 600, height: 400, borderRadius: '50%', background: scene.hex + '12', transform: 'translateX(-50%)', filter: 'blur(80px)', pointerEvents: 'none' }}/>
         
-        {/* Pass lt=3 to trick the animation into being fully loaded instantly */}
         <SceneView scene={scene} lt={3} />
         
-        {/* Button to go back to the 8 grid menu */}
-        <div onClick={() => setManualScene(null)} style={{
+        <div className="nav-button" onClick={() => setManualScene(null)} style={{
             position: 'absolute', top: 18, left: 22, cursor: 'pointer',
-            fontFamily: SANS, fontSize: 14, color: '#e6edf3',
+            fontFamily: SANS, fontSize: 14, color: '#e6edf3', transition: 'background 0.2s',
             background: 'rgba(255,255,255,0.1)', padding: '6px 12px', borderRadius: '4px', zIndex: 10
         }}>
           ← Back to Menu
@@ -404,7 +410,6 @@ function App() {
         return <SceneView key={i} scene={scene} lt={Math.max(0, lt)} />;
       })}
 
-      {/* Pass the state updater function so the buttons work */}
       {inOutro && <OutroScene t={t - outroStart} onSelectScene={setManualScene} />}
 
       {!inTitle && !inOutro && <ProgressDots idx={clamped} />}
@@ -413,15 +418,26 @@ function App() {
         python / print()
       </div>
       
-      {/* Back button to the main hub site */}
-      <a href="../index.html" style={{
+      {/* Back button to Hub */}
+      <a href="../index.html" className="nav-button" style={{
           position: 'absolute', top: 18, left: 22,
-          fontFamily: SANS, fontSize: 14, color: '#e6edf3',
+          fontFamily: SANS, fontSize: 14, color: '#e6edf3', transition: 'background 0.2s',
           textDecoration: 'none', background: 'rgba(255,255,255,0.1)',
           padding: '6px 12px', borderRadius: '4px', zIndex: 10
       }}>
         ← Back to Hub
       </a>
+
+      {/* SKIP BUTTON */}
+      {!inOutro && (
+        <div className="nav-button" onClick={skipToEnd} style={{
+            position: 'absolute', bottom: 18, right: 22, cursor: 'pointer',
+            fontFamily: SANS, fontSize: 14, color: '#e6edf3', transition: 'background 0.2s',
+            background: 'rgba(255,255,255,0.1)', padding: '6px 12px', borderRadius: '4px', zIndex: 10
+        }}>
+          Skip to Menu ⏭
+        </div>
+      )}
     </div>
   );
 }
