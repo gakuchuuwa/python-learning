@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>What can print() do? — Python</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="animations.jsx"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
+#root { position: absolute; inset: 0; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+
+const SCENES = [
+  {
+    label: "01",
+    title: "Print a string",
+    code: `print("Hello, World!")`,
+    output: `Hello, World!`,
+    tip: 'Any text inside quotes gets printed to the screen.',
+    hex: '#4ade80',
+  },
+  {
+    label: "02",
+    title: "Print numbers",
+    code: `print(42)\nprint(3.14)\nprint(True)`,
+    output: `42\n3.14\nTrue`,
+    tip: "Numbers and booleans don't need quotes.",
+    hex: '#60a5fa',
+  },
+  {
+    label: "03",
+    title: "Print multiple items",
+    code: `print("Name:", "Alice", 25)`,
+    output: `Name: Alice 25`,
+    tip: 'Separate values with commas — print() adds spaces between them.',
+    hex: '#c084fc',
+  },
+  {
+    label: "04",
+    title: "Custom separator  sep=",
+    code: `print("2025", "01", "19", sep="-")\nprint("a", "b", "c", sep=" | ")`,
+    output: `2025-01-19\na | b | c`,
+    tip: 'sep= changes what goes between items. Default is a space " ".',
+    hex: '#fb923c',
+  },
+  {
+    label: "05",
+    title: "Custom ending  end=",
+    code: `print("Loading", end="...")\nprint("Done!")`,
+    output: `Loading...Done!`,
+    tip: 'end= changes what print adds at the end. Default is a newline.',
+    hex: '#facc15',
+  },
+  {
+    label: "06",
+    title: "Variables & f-strings",
+    code: `name = "Alice"\nage = 20\nprint(f"Hi, {name}! You are {age}.")`,
+    output: `Hi, Alice! You are 20.`,
+    tip: 'Use f"..." to embed variables directly inside a string.',
+    hex: '#f472b6',
+  },
+  {
+    label: "07",
+    title: "Escape characters",
+    code: `print("Line 1\\nLine 2")\nprint("\\tIndented")`,
+    output: `Line 1\nLine 2\n\tIndented`,
+    tip: '\\n = new line,  \\t = tab.  Special codes inside strings.',
+    hex: '#2dd4bf',
+  },
+  {
+    label: "08",
+    title: "Print an empty line",
+    code: `print("First")\nprint()\nprint("Third")`,
+    output: `First\n\nThird`,
+    tip: 'print() with no arguments prints a blank line — great for spacing.',
+    hex: '#a78bfa',
+  },
+];
+
+const TITLE_DUR = 3;
+const OUTRO_DUR = 4;
+const SCENE_DUR = 5.5;
+const TOTAL_DUR = TITLE_DUR + SCENES.length * SCENE_DUR + OUTRO_DUR;
+
+const MONO = '"JetBrains Mono", ui-monospace, monospace';
+const SANS = '"Inter", system-ui, sans-serif';
+
+// ── Syntax highlighter ──────────────────────────────────────────────────────
+function highlight(code) {
+  const lines = code.split('\n');
+  return lines.map((line, li) => {
+    const tokens = [];
+    const re = /(f?"[^"]*"|f?'[^']*'|#[^\n]*|\b(?:print|True|False|None|sep|end)\b|\b\d+\.?\d*\b|[a-zA-Z_]\w*)/g;
+    let last = 0, m;
+    while ((m = re.exec(line)) !== null) {
+      if (m.index > last) tokens.push({ t: line.slice(last, m.index), c: '#c9d1d9' });
+      const tok = m[0];
+      let color = '#c9d1d9';
+      if (/^f?["']/.test(tok))                        color = '#a5d6ff';
+      else if (tok === 'print')                        color = '#d2a8ff';
+      else if (['sep','end'].includes(tok))            color = '#79c0ff';
+      else if (['True','False','None'].includes(tok))  color = '#ff7b72';
+      else if (/^\d/.test(tok))                        color = '#f0883e';
+      else if (tok.startsWith('#'))                    color = '#8b949e';
+      tokens.push({ t: tok, c: color });
+      last = m.index + tok.length;
+    }
+    if (last < line.length) tokens.push({ t: line.slice(last), c: '#c9d1d9' });
+    return (
+      <div key={li} style={{ minHeight: '1.6em', whiteSpace: 'pre' }}>
+        {tokens.map((tk, i) => <span key={i} style={{ color: tk.c }}>{tk.t}</span>)}
+        {tokens.length === 0 && <span> </span>}
+      </div>
+    );
+  });
+}
+
+// ── Code window ─────────────────────────────────────────────────────────────
+function CodeWindow({ code, output, hex, codeP, outP }) {
+  const lines = code.split('\n');
+  const visLines = Math.max(1, Math.ceil(lines.length * codeP));
+  const shownCode = lines.slice(0, visLines).join('\n');
+  const outLines = output.split('\n');
+  const visOut = Math.max(0, Math.ceil(outLines.length * outP));
+
+  return (
+    <div style={{ width: 820, fontFamily: MONO, fontSize: 21, lineHeight: 1.65 }}>
+      {/* Editor */}
+      <div style={{
+        background: '#161b22', borderRadius: 12, overflow: 'hidden',
+        boxShadow: '0 24px 64px rgba(0,0,0,0.55)',
+        border: '1px solid rgba(255,255,255,0.07)',
+      }}>
+        {/* Title bar */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 7,
+          padding: '10px 16px', background: '#21262d',
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
+        }}>
+          <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#ff5f57' }}/>
+          <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#febc2e' }}/>
+          <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#28c840' }}/>
+          <span style={{ marginLeft: 10, color: '#8b949e', fontSize: 13, fontFamily: SANS }}>main.py</span>
+        </div>
+        {/* Code */}
+        <div style={{ padding: '20px 28px', minHeight: 72 }}>
+          {highlight(shownCode)}
+          {codeP < 1 && (
+            <span style={{
+              display: 'inline-block', width: 2, height: '1.1em',
+              background: hex, verticalAlign: 'text-bottom', marginLeft: 1,
+              animation: 'blink 1s step-start infinite',
+            }}/>
+          )}
+        </div>
+      </div>
+
+      {/* Output */}
+      {outP > 0 && (
+        <div style={{
+          marginTop: 10, background: '#0d1117', borderRadius: 10,
+          border: '1px solid rgba(255,255,255,0.07)', overflow: 'hidden',
+          opacity: Math.min(1, outP * 3),
+          transform: `translateY(${(1 - Math.min(1, outP * 3)) * 12}px)`,
+        }}>
+          <div style={{
+            padding: '7px 18px', background: '#161b22',
+            borderBottom: '1px solid rgba(255,255,255,0.06)',
+            display: 'flex', alignItems: 'center', gap: 6,
+          }}>
+            <div style={{ width: 8, height: 8, borderRadius: '50%', background: hex }}/>
+            <span style={{ color: hex, fontSize: 12, fontFamily: SANS, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Output</span>
+          </div>
+          <div style={{ padding: '14px 28px' }}>
+            {outLines.slice(0, visOut).map((ln, i) => (
+              <div key={i} style={{ color: '#3fb950', fontFamily: MONO, fontSize: 21, minHeight: '1.65em', whiteSpace: 'pre' }}>
+                {ln === '' ? ' ' : ln}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Scene ───────────────────────────────────────────────────────────────────
+function SceneView({ scene, lt }) {
+  const fadeIn  = Math.min(1, lt / 0.35);
+  const fadeOut = lt > 5.1 ? 1 - Math.min(1, (lt - 5.1) / 0.4) : 1;
+  const op      = fadeIn * fadeOut;
+
+  const codeP = lt < 0.35 ? 0 : Math.min(1, (lt - 0.35) / 1.1);
+  const outP  = lt < 1.5  ? 0 : (lt - 1.5) / 0.7;
+  const tipP  = lt < 2.3  ? 0 : Math.min(1, (lt - 2.3) / 0.5);
+
+  return (
+    <div style={{
+      position: 'absolute', inset: 0, opacity: op,
+      display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center',
+      padding: '0 40px',
+    }}>
+      {/* Header row */}
+      <div style={{
+        width: 820, display: 'flex', alignItems: 'center',
+        justifyContent: 'space-between', marginBottom: 14,
+      }}>
+        <div style={{ fontFamily: SANS, fontSize: 27, fontWeight: 800, color: '#e6edf3', letterSpacing: '-0.02em' }}>
+          {scene.title}
+        </div>
+        <div style={{
+          fontFamily: MONO, fontSize: 13, color: scene.hex,
+          background: scene.hex + '22', padding: '4px 14px',
+          borderRadius: 20, border: `1px solid ${scene.hex}55`,
+        }}>
+          {scene.label} / 08
+        </div>
+      </div>
+
+      <CodeWindow code={scene.code} output={scene.output} hex={scene.hex} codeP={codeP} outP={outP} />
+
+      {/* Tip */}
+      <div style={{
+        width: 820, marginTop: 14,
+        padding: '12px 20px',
+        background: scene.hex + '18',
+        border: `1px solid ${scene.hex}44`,
+        borderRadius: 8,
+        opacity: tipP,
+        transform: `translateY(${(1 - tipP) * 8}px)`,
+        display: 'flex', alignItems: 'center', gap: 10,
+      }}>
+        <span style={{ color: scene.hex, fontSize: 18, fontWeight: 700 }}>→</span>
+        <span style={{ color: '#e6edf3', fontFamily: SANS, fontSize: 17, fontWeight: 500, lineHeight: 1.5 }}>
+          {scene.tip}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ── Title scene ─────────────────────────────────────────────────────────────
+function TitleScene({ t }) {
+  const p   = Math.min(1, t / 0.8);
+  const out = t > 2.4 ? 1 - Math.min(1, (t - 2.4) / 0.6) : 1;
+
+  // Animated python "snake" dots
+  const dots = SCENES.map((s, i) => ({
+    x: 300 + i * 32,
+    y: 340 + Math.sin(t * 2 + i * 0.8) * 6,
+    op: Math.min(1, Math.max(0, (t - i * 0.06) / 0.5)),
+    hex: s.hex,
+  }));
+
+  return (
+    <div style={{
+      position: 'absolute', inset: 0,
+      display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center',
+      opacity: p * out,
+    }}>
+      <div style={{
+        fontFamily: MONO, fontSize: 15, color: '#4ade80',
+        letterSpacing: '0.2em', textTransform: 'uppercase',
+        marginBottom: 18, fontWeight: 700,
+      }}>
+        Python Basics · Chapter 1
+      </div>
+      <div style={{
+        fontFamily: SANS, fontSize: 80, fontWeight: 800,
+        color: '#e6edf3', letterSpacing: '-0.04em', lineHeight: 1,
+        textAlign: 'center',
+      }}>
+        What can{' '}
+        <span style={{ color: '#d2a8ff', fontFamily: MONO, fontSize: 74 }}>print()</span>
+        {' '}do?
+      </div>
+      <div style={{ marginTop: 24, display: 'flex', gap: 10 }}>
+        {dots.map((d, i) => (
+          <div key={i} style={{
+            width: 10, height: 10, borderRadius: '50%',
+            background: d.hex, opacity: d.op,
+            transform: `translateY(${Math.sin(t * 2 + i * 0.8) * 4}px)`,
+          }}/>
+        ))}
+      </div>
+      <div style={{ marginTop: 18, color: '#8b949e', fontFamily: SANS, fontSize: 18 }}>
+        8 things every beginner should know
+      </div>
+    </div>
+  );
+}
+
+// ── Outro scene ─────────────────────────────────────────────────────────────
+function OutroScene({ t }) {
+  const fade = Math.min(1, t / 0.6);
+  return (
+    <div style={{
+      position: 'absolute', inset: 0,
+      display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center',
+      opacity: fade,
+    }}>
+      <div style={{ fontFamily: SANS, fontSize: 52, fontWeight: 800, color: '#e6edf3', letterSpacing: '-0.03em', marginBottom: 8 }}>
+        You now know <span style={{ color: '#d2a8ff', fontFamily: MONO, fontSize: 48 }}>print()</span>
+      </div>
+      <div style={{ fontFamily: MONO, fontSize: 16, color: '#4ade80', marginBottom: 36, letterSpacing: '0.08em' }}>
+        ✓ Chapter 1 complete
+      </div>
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)',
+        gap: 10, width: 840,
+      }}>
+        {SCENES.map((s, i) => {
+          const itemP = Math.min(1, Math.max(0, (t - 0.4 - i * 0.1) / 0.35));
+          return (
+            <div key={i} style={{
+              padding: '12px 16px', background: '#161b22',
+              borderRadius: 10, border: `1px solid ${s.hex}44`,
+              opacity: itemP, transform: `translateY(${(1 - itemP) * 12}px)`,
+            }}>
+              <div style={{ color: s.hex, fontFamily: MONO, fontSize: 12, marginBottom: 5 }}>{s.label}</div>
+              <div style={{ color: '#8b949e', fontFamily: SANS, fontSize: 13, lineHeight: 1.4 }}>{s.title}</div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── Progress bar ─────────────────────────────────────────────────────────────
+function ProgressDots({ idx }) {
+  return (
+    <div style={{
+      position: 'absolute', bottom: 22,
+      left: '50%', transform: 'translateX(-50%)',
+      display: 'flex', gap: 7,
+    }}>
+      {SCENES.map((s, i) => (
+        <div key={i} style={{
+          height: 7, borderRadius: 4,
+          width: i === idx ? 22 : 7,
+          background: i === idx ? s.hex : 'rgba(255,255,255,0.15)',
+          transition: 'width 0.3s ease, background 0.3s ease',
+        }}/>
+      ))}
+    </div>
+  );
+}
+
+// ── App ──────────────────────────────────────────────────────────────────────
+function App() {
+  const t = useTime();
+  const outroStart = TITLE_DUR + SCENES.length * SCENE_DUR;
+  const inTitle = t < TITLE_DUR;
+  const inOutro = t >= outroStart;
+  const sceneIdx = inTitle ? -1 : inOutro ? SCENES.length : Math.floor((t - TITLE_DUR) / SCENE_DUR);
+  const clamped  = Math.max(0, Math.min(SCENES.length - 1, sceneIdx));
+
+  return (
+    <div style={{ position: 'absolute', inset: 0, background: '#0d1117', overflow: 'hidden' }}>
+      {/* Subtle dot grid */}
+      <div style={{
+        position: 'absolute', inset: 0, pointerEvents: 'none',
+        backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px)',
+        backgroundSize: '36px 36px',
+      }}/>
+      {/* Ambient glow */}
+      {!inTitle && !inOutro && (
+        <div style={{
+          position: 'absolute', top: -200, left: '50%',
+          width: 600, height: 400, borderRadius: '50%',
+          background: SCENES[clamped].hex + '12',
+          transform: 'translateX(-50%)',
+          filter: 'blur(80px)',
+          transition: 'background 0.8s ease',
+          pointerEvents: 'none',
+        }}/>
+      )}
+
+      {inTitle && <TitleScene t={t} />}
+
+      {!inTitle && !inOutro && SCENES.map((scene, i) => {
+        const sceneStart = TITLE_DUR + i * SCENE_DUR;
+        const lt = t - sceneStart;
+        if (lt < -0.15 || lt > SCENE_DUR + 0.15) return null;
+        return <SceneView key={i} scene={scene} lt={Math.max(0, lt)} />;
+      })}
+
+      {inOutro && <OutroScene t={t - outroStart} />}
+
+      {!inTitle && !inOutro && <ProgressDots idx={clamped} />}
+
+      {/* Watermark */}
+      <div style={{
+        position: 'absolute', top: 18, right: 22,
+        fontFamily: MONO, fontSize: 12,
+        color: 'rgba(255,255,255,0.18)',
+        letterSpacing: '0.05em',
+      }}>
+        python / print()
+      </div>
+    </div>
+  );
+}
+
+// Blink cursor keyframe
+const styleTag = document.createElement('style');
+styleTag.textContent = `@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }`;
+document.head.appendChild(styleTag);
+
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <Stage
+    width={1280} height={720}
+    duration={TOTAL_DUR}
+    background="#0d1117"
+    loop={true} autoplay={true}
+    persistKey="print-explainer"
+  >
+    <App />
+  </Stage>
+);
+</script>
+</body>
+</html>
