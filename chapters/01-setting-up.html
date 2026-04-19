@@ -18,10 +18,11 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #0d1117; }
     position: relative;
     background: #0d1117;
     overflow: hidden;
-    /* Scales the 1280x720 stage to fit the window */
     transform-origin: center center;
 }
 @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+/* Add a simple hover effect for the buttons */
+.scene-button:hover { filter: brightness(1.2); }
 </style>
 </head>
 <body>
@@ -30,19 +31,18 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #0d1117; }
 <script type="text/babel">
 const { useState, useEffect } = React;
 
-// ── Custom Hook to replace Claude's animation timer ─────────────────────────
+// ── Custom Hook to run animation and STOP at the end ────────────────────────
 function useTime() {
   const [time, setTime] = useState(0);
   useEffect(() => {
     let start = performance.now();
     let frameId;
     const tick = (now) => {
-      // time in seconds
       let current = (now - start) / 1000;
-      // Loop the animation when it reaches TOTAL_DUR
+      // Stop the animation at the end instead of looping
       if (current >= TOTAL_DUR) {
-        start = now;
-        current = 0;
+        setTime(TOTAL_DUR);
+        return; 
       }
       setTime(current);
       frameId = requestAnimationFrame(tick);
@@ -55,70 +55,14 @@ function useTime() {
 
 // ── Original Scene Data ─────────────────────────────────────────────────────
 const SCENES = [
-  {
-    label: "01",
-    title: "Print a string",
-    code: `print("Hello, World!")`,
-    output: `Hello, World!`,
-    tip: 'Any text inside quotes gets printed to the screen.',
-    hex: '#4ade80',
-  },
-  {
-    label: "02",
-    title: "Print numbers",
-    code: `print(42)\nprint(3.14)\nprint(True)`,
-    output: `42\n3.14\nTrue`,
-    tip: "Numbers and booleans don't need quotes.",
-    hex: '#60a5fa',
-  },
-  {
-    label: "03",
-    title: "Print multiple items",
-    code: `print("Name:", "Alice", 25)`,
-    output: `Name: Alice 25`,
-    tip: 'Separate values with commas — print() adds spaces between them.',
-    hex: '#c084fc',
-  },
-  {
-    label: "04",
-    title: "Custom separator  sep=",
-    code: `print("2025", "01", "19", sep="-")\nprint("a", "b", "c", sep=" | ")`,
-    output: `2025-01-19\na | b | c`,
-    tip: 'sep= changes what goes between items. Default is a space " ".',
-    hex: '#fb923c',
-  },
-  {
-    label: "05",
-    title: "Custom ending  end=",
-    code: `print("Loading", end="...")\nprint("Done!")`,
-    output: `Loading...Done!`,
-    tip: 'end= changes what print adds at the end. Default is a newline.',
-    hex: '#facc15',
-  },
-  {
-    label: "06",
-    title: "Variables & f-strings",
-    code: `name = "Alice"\nage = 20\nprint(f"Hi, {name}! You are {age}.")`,
-    output: `Hi, Alice! You are 20.`,
-    tip: 'Use f"..." to embed variables directly inside a string.',
-    hex: '#f472b6',
-  },
-  {
-    label: "07",
-    title: "Escape characters",
-    code: `print("Line 1\\nLine 2")\nprint("\\tIndented")`,
-    output: `Line 1\nLine 2\n\tIndented`,
-    tip: '\\n = new line,  \\t = tab.  Special codes inside strings.',
-    hex: '#2dd4bf',
-  },
-  {
-    label: "08",
-    title: "Print an empty line",
-    code: `print("First")\nprint()\nprint("Third")`,
-    output: `First\n\nThird`,
-    tip: 'print() with no arguments prints a blank line — great for spacing.',
-    hex: '#a78bfa',
-  },
+  { label: "01", title: "Print a string", code: `print("Hello, World!")`, output: `Hello, World!`, tip: 'Any text inside quotes gets printed to the screen.', hex: '#4ade80' },
+  { label: "02", title: "Print numbers", code: `print(42)\nprint(3.14)\nprint(True)`, output: `42\n3.14\nTrue`, tip: "Numbers and booleans don't need quotes.", hex: '#60a5fa' },
+  { label: "03", title: "Print multiple items", code: `print("Name:", "Alice", 25)`, output: `Name: Alice 25`, tip: 'Separate values with commas — print() adds spaces between them.', hex: '#c084fc' },
+  { label: "04", title: "Custom separator  sep=", code: `print("2025", "01", "19", sep="-")\nprint("a", "b", "c", sep=" | ")`, output: `2025-01-19\na | b | c`, tip: 'sep= changes what goes between items. Default is a space " ".', hex: '#fb923c' },
+  { label: "05", title: "Custom ending  end=", code: `print("Loading", end="...")\nprint("Done!")`, output: `Loading...Done!`, tip: 'end= changes what print adds at the end. Default is a newline.', hex: '#facc15' },
+  { label: "06", title: "Variables & f-strings", code: `name = "Alice"\nage = 20\nprint(f"Hi, {name}! You are {age}.")`, output: `Hi, Alice! You are 20.`, tip: 'Use f"..." to embed variables directly inside a string.', hex: '#f472b6' },
+  { label: "07", title: "Escape characters", code: `print("Line 1\\nLine 2")\nprint("\\tIndented")`, output: `Line 1\nLine 2\n\tIndented`, tip: '\\n = new line,  \\t = tab.  Special codes inside strings.', hex: '#2dd4bf' },
+  { label: "08", title: "Print an empty line", code: `print("First")\nprint()\nprint("Third")`, output: `First\n\nThird`, tip: 'print() with no arguments prints a blank line — great for spacing.', hex: '#a78bfa' },
 ];
 
 const TITLE_DUR = 3;
@@ -327,7 +271,7 @@ function TitleScene({ t }) {
 }
 
 // ── Outro scene ─────────────────────────────────────────────────────────────
-function OutroScene({ t }) {
+function OutroScene({ t, onSelectScene }) {
   const fade = Math.min(1, t / 0.6);
   return (
     <div style={{
@@ -340,7 +284,7 @@ function OutroScene({ t }) {
         You now know <span style={{ color: '#d2a8ff', fontFamily: MONO, fontSize: 48 }}>print()</span>
       </div>
       <div style={{ fontFamily: MONO, fontSize: 16, color: '#4ade80', marginBottom: 36, letterSpacing: '0.08em' }}>
-        ✓ Chapter 1 complete
+        ✓ Chapter 1 complete. Click any card below to review.
       </div>
       <div style={{
         display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)',
@@ -349,10 +293,12 @@ function OutroScene({ t }) {
         {SCENES.map((s, i) => {
           const itemP = Math.min(1, Math.max(0, (t - 0.4 - i * 0.1) / 0.35));
           return (
-            <div key={i} style={{
+            <div key={i} className="scene-button" onClick={() => onSelectScene(i)} style={{
+              cursor: 'pointer',
               padding: '12px 16px', background: '#161b22',
               borderRadius: 10, border: `1px solid ${s.hex}44`,
               opacity: itemP, transform: `translateY(${(1 - itemP) * 12}px)`,
+              transition: 'all 0.2s ease'
             }}>
               <div style={{ color: s.hex, fontFamily: MONO, fontSize: 12, marginBottom: 5 }}>{s.label}</div>
               <div style={{ color: '#8b949e', fontFamily: SANS, fontSize: 13, lineHeight: 1.4 }}>{s.title}</div>
@@ -387,6 +333,8 @@ function ProgressDots({ idx }) {
 // ── App ──────────────────────────────────────────────────────────────────────
 function App() {
   const t = useTime();
+  const [manualScene, setManualScene] = useState(null); // Tracks if a user clicked a button
+  
   const outroStart = TITLE_DUR + SCENES.length * SCENE_DUR;
   const inTitle = t < TITLE_DUR;
   const inOutro = t >= outroStart;
@@ -402,28 +350,48 @@ function App() {
       setScale(Math.min(scaleX, scaleY));
     };
     window.addEventListener('resize', handleResize);
-    handleResize(); // Initial call
+    handleResize(); 
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // --- REVIEW MODE (When a button is clicked) ---
+  if (manualScene !== null) {
+    const scene = SCENES[manualScene];
+    return (
+      <div className="stage-container" style={{ transform: `scale(${scale})` }}>
+        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px)', backgroundSize: '36px 36px' }}/>
+        <div style={{ position: 'absolute', top: -200, left: '50%', width: 600, height: 400, borderRadius: '50%', background: scene.hex + '12', transform: 'translateX(-50%)', filter: 'blur(80px)', pointerEvents: 'none' }}/>
+        
+        {/* Pass lt=3 to trick the animation into being fully loaded instantly */}
+        <SceneView scene={scene} lt={3} />
+        
+        {/* Button to go back to the 8 grid menu */}
+        <div onClick={() => setManualScene(null)} style={{
+            position: 'absolute', top: 18, left: 22, cursor: 'pointer',
+            fontFamily: SANS, fontSize: 14, color: '#e6edf3',
+            background: 'rgba(255,255,255,0.1)', padding: '6px 12px', borderRadius: '4px', zIndex: 10
+        }}>
+          ← Back to Menu
+        </div>
+        
+        <div style={{ position: 'absolute', top: 18, right: 22, fontFamily: MONO, fontSize: 12, color: 'rgba(255,255,255,0.18)', letterSpacing: '0.05em' }}>
+          python / print()
+        </div>
+      </div>
+    );
+  }
+
+  // --- NORMAL VIDEO MODE ---
   return (
     <div className="stage-container" style={{ transform: `scale(${scale})` }}>
-      {/* Subtle dot grid */}
-      <div style={{
-        position: 'absolute', inset: 0, pointerEvents: 'none',
-        backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px)',
-        backgroundSize: '36px 36px',
-      }}/>
-      {/* Ambient glow */}
+      <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1px)', backgroundSize: '36px 36px' }}/>
+      
       {!inTitle && !inOutro && (
         <div style={{
           position: 'absolute', top: -200, left: '50%',
           width: 600, height: 400, borderRadius: '50%',
-          background: SCENES[clamped].hex + '12',
-          transform: 'translateX(-50%)',
-          filter: 'blur(80px)',
-          transition: 'background 0.8s ease',
-          pointerEvents: 'none',
+          background: SCENES[clamped].hex + '12', transform: 'translateX(-50%)',
+          filter: 'blur(80px)', transition: 'background 0.8s ease', pointerEvents: 'none',
         }}/>
       )}
 
@@ -436,26 +404,21 @@ function App() {
         return <SceneView key={i} scene={scene} lt={Math.max(0, lt)} />;
       })}
 
-      {inOutro && <OutroScene t={t - outroStart} />}
+      {/* Pass the state updater function so the buttons work */}
+      {inOutro && <OutroScene t={t - outroStart} onSelectScene={setManualScene} />}
 
       {!inTitle && !inOutro && <ProgressDots idx={clamped} />}
 
-      {/* Watermark */}
-      <div style={{
-        position: 'absolute', top: 18, right: 22,
-        fontFamily: MONO, fontSize: 12,
-        color: 'rgba(255,255,255,0.18)',
-        letterSpacing: '0.05em',
-      }}>
+      <div style={{ position: 'absolute', top: 18, right: 22, fontFamily: MONO, fontSize: 12, color: 'rgba(255,255,255,0.18)', letterSpacing: '0.05em' }}>
         python / print()
       </div>
       
-      {/* Back button */}
+      {/* Back button to the main hub site */}
       <a href="../index.html" style={{
           position: 'absolute', top: 18, left: 22,
           fontFamily: SANS, fontSize: 14, color: '#e6edf3',
           textDecoration: 'none', background: 'rgba(255,255,255,0.1)',
-          padding: '6px 12px', borderRadius: '4px'
+          padding: '6px 12px', borderRadius: '4px', zIndex: 10
       }}>
         ← Back to Hub
       </a>
@@ -463,7 +426,6 @@ function App() {
   );
 }
 
-// We no longer use <Stage>, just standard React rendering
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(<App />);
 </script>
