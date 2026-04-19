@@ -4,20 +4,56 @@
 <meta charset="UTF-8">
 <title>What can print() do? — Python</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
-<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
-<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
-<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
-<script type="text/babel" src="animations.jsx"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
+
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
-html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
-#root { position: absolute; inset: 0; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: #0d1117; }
+#root { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+.stage-container {
+    width: 1280px;
+    height: 720px;
+    position: relative;
+    background: #0d1117;
+    overflow: hidden;
+    /* Scales the 1280x720 stage to fit the window */
+    transform-origin: center center;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
 </style>
 </head>
 <body>
 <div id="root"></div>
-<script type="text/babel">
 
+<script type="text/babel">
+const { useState, useEffect } = React;
+
+// ── Custom Hook to replace Claude's animation timer ─────────────────────────
+function useTime() {
+  const [time, setTime] = useState(0);
+  useEffect(() => {
+    let start = performance.now();
+    let frameId;
+    const tick = (now) => {
+      // time in seconds
+      let current = (now - start) / 1000;
+      // Loop the animation when it reaches TOTAL_DUR
+      if (current >= TOTAL_DUR) {
+        start = now;
+        current = 0;
+      }
+      setTime(current);
+      frameId = requestAnimationFrame(tick);
+    };
+    frameId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frameId);
+  }, []);
+  return time;
+}
+
+// ── Original Scene Data ─────────────────────────────────────────────────────
 const SCENES = [
   {
     label: "01",
@@ -133,13 +169,11 @@ function CodeWindow({ code, output, hex, codeP, outP }) {
 
   return (
     <div style={{ width: 820, fontFamily: MONO, fontSize: 21, lineHeight: 1.65 }}>
-      {/* Editor */}
       <div style={{
         background: '#161b22', borderRadius: 12, overflow: 'hidden',
         boxShadow: '0 24px 64px rgba(0,0,0,0.55)',
         border: '1px solid rgba(255,255,255,0.07)',
       }}>
-        {/* Title bar */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: 7,
           padding: '10px 16px', background: '#21262d',
@@ -150,7 +184,6 @@ function CodeWindow({ code, output, hex, codeP, outP }) {
           <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#28c840' }}/>
           <span style={{ marginLeft: 10, color: '#8b949e', fontSize: 13, fontFamily: SANS }}>main.py</span>
         </div>
-        {/* Code */}
         <div style={{ padding: '20px 28px', minHeight: 72 }}>
           {highlight(shownCode)}
           {codeP < 1 && (
@@ -162,8 +195,6 @@ function CodeWindow({ code, output, hex, codeP, outP }) {
           )}
         </div>
       </div>
-
-      {/* Output */}
       {outP > 0 && (
         <div style={{
           marginTop: 10, background: '#0d1117', borderRadius: 10,
@@ -209,7 +240,6 @@ function SceneView({ scene, lt }) {
       alignItems: 'center', justifyContent: 'center',
       padding: '0 40px',
     }}>
-      {/* Header row */}
       <div style={{
         width: 820, display: 'flex', alignItems: 'center',
         justifyContent: 'space-between', marginBottom: 14,
@@ -225,10 +255,7 @@ function SceneView({ scene, lt }) {
           {scene.label} / 08
         </div>
       </div>
-
       <CodeWindow code={scene.code} output={scene.output} hex={scene.hex} codeP={codeP} outP={outP} />
-
-      {/* Tip */}
       <div style={{
         width: 820, marginTop: 14,
         padding: '12px 20px',
@@ -253,7 +280,6 @@ function TitleScene({ t }) {
   const p   = Math.min(1, t / 0.8);
   const out = t > 2.4 ? 1 - Math.min(1, (t - 2.4) / 0.6) : 1;
 
-  // Animated python "snake" dots
   const dots = SCENES.map((s, i) => ({
     x: 300 + i * 32,
     y: 340 + Math.sin(t * 2 + i * 0.8) * 6,
@@ -367,8 +393,21 @@ function App() {
   const sceneIdx = inTitle ? -1 : inOutro ? SCENES.length : Math.floor((t - TITLE_DUR) / SCENE_DUR);
   const clamped  = Math.max(0, Math.min(SCENES.length - 1, sceneIdx));
 
+  // Auto-scaling logic to fit the 1280x720 stage to the browser window
+  const [scale, setScale] = useState(1);
+  useEffect(() => {
+    const handleResize = () => {
+      const scaleX = window.innerWidth / 1280;
+      const scaleY = window.innerHeight / 720;
+      setScale(Math.min(scaleX, scaleY));
+    };
+    window.addEventListener('resize', handleResize);
+    handleResize(); // Initial call
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   return (
-    <div style={{ position: 'absolute', inset: 0, background: '#0d1117', overflow: 'hidden' }}>
+    <div className="stage-container" style={{ transform: `scale(${scale})` }}>
       {/* Subtle dot grid */}
       <div style={{
         position: 'absolute', inset: 0, pointerEvents: 'none',
@@ -410,26 +449,23 @@ function App() {
       }}>
         python / print()
       </div>
+      
+      {/* Back button */}
+      <a href="../index.html" style={{
+          position: 'absolute', top: 18, left: 22,
+          fontFamily: SANS, fontSize: 14, color: '#e6edf3',
+          textDecoration: 'none', background: 'rgba(255,255,255,0.1)',
+          padding: '6px 12px', borderRadius: '4px'
+      }}>
+        ← Back to Hub
+      </a>
     </div>
   );
 }
 
-// Blink cursor keyframe
-const styleTag = document.createElement('style');
-styleTag.textContent = `@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }`;
-document.head.appendChild(styleTag);
-
-ReactDOM.createRoot(document.getElementById('root')).render(
-  <Stage
-    width={1280} height={720}
-    duration={TOTAL_DUR}
-    background="#0d1117"
-    loop={true} autoplay={true}
-    persistKey="print-explainer"
-  >
-    <App />
-  </Stage>
-);
+// We no longer use <Stage>, just standard React rendering
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
 </script>
 </body>
 </html>
